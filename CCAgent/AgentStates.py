@@ -1,5 +1,5 @@
 
-from .Agent import AgentState
+from CCAgent.core import AgentState
 
 class UnAvailable(AgentState):
     pass

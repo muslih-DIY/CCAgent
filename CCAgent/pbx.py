@@ -5,12 +5,12 @@ pbx.py
 This impliment the function commands for agent to communicate with the pbx
 
 """
-from collections import namedtuple
+#from collections import namedtuple
 from typing import Dict,Callable
 from pystrix import ami
 from pystrix.ami import core
 
-class pbx():
+class PBX():
     """
     """
     _manager:   ami.Manager = None
@@ -85,16 +85,56 @@ class pbx():
         self._manager.close()
 
 
-class outbound_dialer(pbx):
-
-    def CreatBridge(self):
-        pass
+class PBX_OBD(PBX):
 
 
-class Error(Exception):
+    def creat_bridge(
+        self,
+        agentid:str
+        ):
+        "It will create a bridge by calling "
+        conference_id = PBX_OBD.get_bridge_id(agentid)
+        return conference_id
+
+    def leave_bridge(
+        self,
+        agentid:str
+        ):
+        "It will kick the agent out of the Bridge and Others may stay or not"
+
+        conference_id = PBX_OBD.get_bridge_id(agentid)
+
+        return conference_id
+
+    def caller_join_bridge(
+        self,
+        number:str,
+        bridge:str,
+        ):
+        "call a number and join to a bridge/Agent"
+        print('INFO:',f'originatesd : calling {number} to bridge {bridge}')
+        return 1
+        
+
+    def caller_kick_bridge(
+        self,
+        number:str,
+        bridge:str,
+        ):
+        "kick a caller out of the Bridge"
+        print('INFO:',f'KickAgent : Kick {number} out of the bridge {bridge}')
+        return 1
+
+    @staticmethod
+    def get_bridge_id(agentid:str)->str:
+        'It return the id for an agent'
+        return '-'.join(['OBD_CONF_',agentid])
+
+
+class PBXError(Exception):
     "base exception for this class"
 
-class ConnectionError(Error):
+class PBXConnectionError(PBXError):
     "connection related"
 
 
