@@ -9,6 +9,7 @@ This impliment the function commands for agent to communicate with the pbx
 from typing import Dict,Callable
 from pystrix import ami
 from pystrix.ami import core
+import functools
 
 class pbx():
     """
@@ -20,10 +21,10 @@ class pbx():
 
     def __init__(self,host:str,port:int,user:str,password:str,debug=False) -> None:
         self._host = host
-        self._port = port
+        self._port = int(port)
         self._username = user
         self._password = password
-        self.debug = debug
+        self.debug = debug.lower() in ('1','true','yes')
         self._manager = ami.Manager(debug=debug)
         self.regiser_call_back({
             'Shutdown' : self._handle_shutdown,
@@ -84,10 +85,42 @@ class pbx():
         "close connection with the asterisk"
         self._manager.close()
         self._connection_status = False
+    
+    @staticmethod
+    def sendaction(amiaction):
+
+        @functools.wraps(amiaction)
+        def decorate(self,*args,**kwargs):
+    
+            return self._manager.send_action(amiaction(self,*args,**kwargs))
+        
+        return decorate
+
+
+    @sendaction
+    def Originate(self,
+        channel: str, context: str,extension: str,
+        priority: int=1,timeout = None,callerid: str = None,
+        variables: dict = {},account: str = None,async_: bool = True):
+        "originate a call to extension and join to another extension"
+        return core.Originate_Context(channel,context,extension,priority,timeout,callerid,variables,account,async_)
+
+    @sendaction
+    def ConfbridgeKick(self,conference_id: str, channel: str):
+        return ami.app_confbridge.ConfbridgeKick(conference_id,channel)
 
 
 class outbound_pbx(pbx):
     """obd"""
+    @staticmethod
+    def get_bridge_id(agentid:str)->str:
+        'It return the id for an agent'
+        return ''.join(['OBDBRIDGE',agentid])
+
+    @staticmethod
+    def get_channel(endpoint:str)->str:
+        'It return the id for an agent'
+        return f"PJSIP/{endpoint}"
 
     def creat_bridge(
         self,
@@ -95,7 +128,9 @@ class outbound_pbx(pbx):
         ):
         "It will create a bridge by calling "
         conference_id = outbound_pbx.get_bridge_id(agentid)
-        return conference_id
+        print('originate.....')
+        return self.Originate(f'PJSIP/{agentid}','agent-conf',conference_id,1)
+         
 
     def leave_bridge(
         self,
@@ -104,8 +139,8 @@ class outbound_pbx(pbx):
         "It will kick the agent out of the Bridge and Others may stay or not"
 
         conference_id = outbound_pbx.get_bridge_id(agentid)
-
-        return conference_id
+        channel_id = outbound_pbx.get_channel(agentid)
+        return self.ConfbridgeKick(conference_id,channel_id)
 
     def caller_join_bridge(
         self,
@@ -125,10 +160,7 @@ class outbound_pbx(pbx):
         print('INFO:',f'KickAgent : Kick {number} out of the bridge {bridge}')
         return 1
 
-    @staticmethod
-    def get_bridge_id(agentid:str)->str:
-        'It return the id for an agent'
-        return '-'.join(['OBD_CONF_',agentid])
+
 
 
 class PBXError(Exception):
