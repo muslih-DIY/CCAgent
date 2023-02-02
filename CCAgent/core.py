@@ -10,10 +10,10 @@ class CCAgent(ABC):
     """
     
     _state: AgentState = None
-    _Agent :str = None
+    _agent :str = None
    
-    def __init__(self,Agent:str) -> None:
-        self._Agent = Agent
+    def __init__(self,agent:str) -> None:
+        self._agent = agent
     
     def update_state(self,state:AgentState):
         
@@ -31,11 +31,11 @@ class CCAgent(ABC):
         self._state.Agent = self
 
     @abstractmethod
-    def Login(self)->None:
+    def login(self)->None:
         pass
 
     @abstractmethod
-    def Logout(self)->None:
+    def logout(self)->None:
         pass
 
     @abstractmethod
@@ -57,9 +57,9 @@ class CCAgent(ABC):
 
 
 class AgentState(ABC):
-    
+
     __CCAgent:CCAgent = None
-    
+
     @property
     def Agent(self)-> CCAgent:
 

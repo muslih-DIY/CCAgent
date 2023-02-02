@@ -10,14 +10,15 @@ from typing import Dict,Callable
 from pystrix import ami
 from pystrix.ami import core
 
-class PBX():
+class pbx():
     """
+    --_pbx base class
     """
     _manager:   ami.Manager = None
     _connection_status: bool = False
     _call_back_register : Dict[str,Callable] = None
 
-    def __init__(self,host,port,user,password,debug) -> None:
+    def __init__(self,host:str,port:int,user:str,password:str,debug=False) -> None:
         self._host = host
         self._port = port
         self._username = user
@@ -32,10 +33,9 @@ class PBX():
 
     def regiser_call_back(self,callbacks:Dict[str,Callable]):
         "regiser callback on ami event to function"
-        [
-            self._manager.register_callback(event,handler) 
-            for event,handler in callbacks.items()
-            ]
+
+        for event,handler in callbacks.items():
+            self._manager.register_callback(event,handler)
 
     def connect(self):
         " Run for connecting to the asterisk"
@@ -44,56 +44,57 @@ class PBX():
             challenge_response = self._manager.send_action(core.Challenge())
             if challenge_response and challenge_response.success:
                 log_action = core.Login(
-                    self._user,
+                    self._username,
                     self._password,
                     challenge=challenge_response.result['Challenge']
                     )
                 self._manager.send_action(log_action)
             else:
                 self._connection_status = False
-                raise ConnectionError(
+                raise PBXConnectionError(
                     "Asterisk did not provide an MD5 challenge token"+
                     (challenge_response is None and ': timed out' or '')
                     )
-        except ami.ManagerSocketError as e:
+        except ami.ManagerSocketError as error:
             self._connection_status = False
-            raise ConnectionError("Unable to connect to Asterisk server: %(error)s" % {
-             'error': str(e),
-            })
+            raise PBXConnectionError(f"Unable to connect to Asterisk server: {error}") from error
+
         except ami.core.ManagerAuthError as reason:
             self._connection_status = False
-            raise ConnectionError("Unable to authenticate to Asterisk server: %(reason)s" % {
-             'reason': reason,
-            })
+            raise PBXConnectionError(f"Unable to authenticate to Asterisk server:{reason}") from reason
+
         except ami.ManagerError as reason:
             self._connection_status = False
-            raise ConnectionError("An unexpected Asterisk error occurred: %(reason)s" % {
-             'reason': reason,
-            })
+            raise PBXConnectionError(f"An unexpected Asterisk error occurred: {reason}") from reason
+
         self._manager.monitor_connection()
-    
-    def _handle_shutdown(self):
+
+    def _handle_shutdown(self, event, manager):
         self._connection_status = False
 
-    def _handle_booting(self):
+    def _handle_booting(self, event, manager):
         self._connection_status = True
 
-    def is_alive(self):
-        return self._connection_status 
+    @property
+    def live(self):
+        "return live or not"
+        return self._connection_status
 
     def close(self):
+        "close connection with the asterisk"
         self._manager.close()
+        self._connection_status = False
 
 
-class PBX_OBD(PBX):
-
+class outbound_pbx(pbx):
+    """obd"""
 
     def creat_bridge(
         self,
         agentid:str
         ):
         "It will create a bridge by calling "
-        conference_id = PBX_OBD.get_bridge_id(agentid)
+        conference_id = outbound_pbx.get_bridge_id(agentid)
         return conference_id
 
     def leave_bridge(
@@ -102,7 +103,7 @@ class PBX_OBD(PBX):
         ):
         "It will kick the agent out of the Bridge and Others may stay or not"
 
-        conference_id = PBX_OBD.get_bridge_id(agentid)
+        conference_id = outbound_pbx.get_bridge_id(agentid)
 
         return conference_id
 
@@ -112,9 +113,8 @@ class PBX_OBD(PBX):
         bridge:str,
         ):
         "call a number and join to a bridge/Agent"
-        print('INFO:',f'originatesd : calling {number} to bridge {bridge}')
+        print('INFO:',f'originated : calling {number} to bridge {bridge}')
         return 1
-        
 
     def caller_kick_bridge(
         self,
